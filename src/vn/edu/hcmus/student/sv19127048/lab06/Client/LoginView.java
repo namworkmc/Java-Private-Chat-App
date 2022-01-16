@@ -5,21 +5,21 @@ import java.awt.*;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.net.Socket;
 
 public class LoginView extends JFrame {
 
+    private Socket socket;
     private DataInputStream dataInputStream;
     private DataOutputStream dataOutputStream;
 
-    public LoginView(DataInputStream dataInputStream, DataOutputStream dataOutputStream) {
+    public LoginView() throws IOException {
         initComponents();
-        this.dataInputStream = dataInputStream;
-        this.dataOutputStream = dataOutputStream;
     }
 
     private void initComponents() {
+
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
 
         loginPanel = new JPanel();
         registerButton = new JButton();
@@ -33,6 +33,10 @@ public class LoginView extends JFrame {
         registerButton.setFont(new java.awt.Font("Segoe UI", Font.PLAIN, 10)); // NOI18N
         registerButton.addActionListener(evt -> {
             try {
+                socket = new Socket("localhost", 9999);
+                dataInputStream = new DataInputStream(socket.getInputStream());
+                dataOutputStream = new DataOutputStream(socket.getOutputStream());
+
                 String username = usernameTextField.getText();
                 String password = String.valueOf(passwordField.getPassword());
 
@@ -49,7 +53,7 @@ public class LoginView extends JFrame {
                         JOptionPane.INFORMATION_MESSAGE
                 );
 
-                if (res.equals("Register Successful")) {
+                if (res.equals("Register successful")) {
                     new ClientService(username, dataInputStream, dataOutputStream);
                     dispose();
                 }
@@ -71,6 +75,10 @@ public class LoginView extends JFrame {
         loginButton.setText("LOGIN");
         loginButton.addActionListener(evt -> {
             try {
+                socket = new Socket("localhost", 9999);
+                dataInputStream = new DataInputStream(socket.getInputStream());
+                dataOutputStream = new DataOutputStream(socket.getOutputStream());
+
                 String username = usernameTextField.getText();
                 String password = String.valueOf(passwordField.getPassword());
 
@@ -162,14 +170,14 @@ public class LoginView extends JFrame {
 
     public void render() {
         try {
-            for (UIManager.LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
+            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
                 if ("Nimbus".equals(info.getName())) {
-                    UIManager.setLookAndFeel(info.getClassName());
+                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
                     break;
                 }
             }
         } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException ex) {
-            Logger.getLogger(LoginView.class.getName()).log(Level.SEVERE, null, ex);
+            java.util.logging.Logger.getLogger(LoginView.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
         }
         //</editor-fold>
 

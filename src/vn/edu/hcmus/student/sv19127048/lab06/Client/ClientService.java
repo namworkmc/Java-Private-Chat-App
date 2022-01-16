@@ -83,33 +83,42 @@ public class ClientService {
             clientView.getSubmitBtn().addActionListener(evt -> {
                 String content = clientView.getInputTextField().getText();
                 String selectedUsername = clientView.getOnlineList().getSelectedValue();
-                try {
-                    dataOutputStream.writeUTF("send-text");
-                    dataOutputStream.writeUTF(selectedUsername);
-                    dataOutputStream.writeUTF(content);
-                    dataOutputStream.flush();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-
-                DefaultListModel<String> model;
-                if (privateChatModel.containsKey(selectedUsername)) {
-                    model = privateChatModel.get(selectedUsername);
+                if (selectedUsername == null) {
+                    JOptionPane.showMessageDialog(
+                            null,
+                            "Please choose receiver",
+                            "Empty receiver",
+                            JOptionPane.INFORMATION_MESSAGE
+                    );
                 } else {
-                    model = new DefaultListModel<>();
+                    try {
+                        dataOutputStream.writeUTF("send-text");
+                        dataOutputStream.writeUTF(selectedUsername);
+                        dataOutputStream.writeUTF(content);
+                        dataOutputStream.flush();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+
+                    DefaultListModel<String> model;
+                    if (privateChatModel.containsKey(selectedUsername)) {
+                        model = privateChatModel.get(selectedUsername);
+                    } else {
+                        model = new DefaultListModel<>();
+                        privateChatModel.put(selectedUsername, model);
+                    }
+                    model.addElement(String.format("%s: %s", username, content));
+                    clientView.getChatHistoryList().setModel(model);
+
                     privateChatModel.put(selectedUsername, model);
+
+                    clientView.getInputTextField().setText("");
                 }
-                model.addElement(String.format("%s: %s", username, content));
-                clientView.getChatHistoryList().setModel(model);
-
-                privateChatModel.put(selectedUsername, model);
-
-                clientView.getInputTextField().setText("");
             });
 
             clientView.getSendFileBtn().addActionListener(evt -> {
                 String selectedUsername = clientView.getOnlineList().getSelectedValue();
-                if (selectedUsername.isEmpty()) {
+                if (selectedUsername == null) {
                     JOptionPane.showMessageDialog(
                             null,
                             "Choose receiver",
@@ -123,23 +132,31 @@ public class ClientService {
                         case APPROVE_OPTION -> {
                             File selectedFile = fileChooser.getSelectedFile();
 
-                            int bytes;
-                            byte[] buffer = new byte[(int) selectedFile.length()];
-                            FileInputStream fileInputStream;
+                            int fileSize = (int) selectedFile.length();
+                            byte[] buffer = new byte[fileSize];
+                            BufferedInputStream bufferedInputStream;
                             try {
-                                fileInputStream = new FileInputStream(selectedFile);
+                                bufferedInputStream = new BufferedInputStream(new FileInputStream(selectedFile));
+                                // Load file vào buffer
+                                bufferedInputStream.read(buffer, 0, fileSize);
 
+                                // Thông tin người gửi và thông tin file
                                 dataOutputStream.writeUTF("send-file");
                                 dataOutputStream.writeUTF(selectedUsername);
                                 dataOutputStream.writeUTF(selectedFile.getName());
                                 dataOutputStream.writeLong(buffer.length);
 
-                                // Chia file ra thành từng mảnh gửi theo phương pháp chunk
-                                while ((bytes = fileInputStream.read(buffer)) != -1) {
-                                    dataOutputStream.write(buffer, 0, bytes);
+                                // Gửi file chunk
+                                int offset = 0;
+                                int bufferSize = 4 * 1024; // mỗi chunk dài 4KB
+                                // Chia file ra thành từng mảnh 4KB gửi theo phương pháp chunk
+                                while (fileSize > 0) {
+                                    dataOutputStream.write(buffer, offset, Math.min(fileSize, bufferSize));
+                                    offset += Math.min(fileSize, bufferSize);
+                                    fileSize -= bufferSize;
                                 }
                                 dataOutputStream.flush();
-                                fileInputStream.close();
+                                bufferedInputStream.close();
                             } catch (IOException e) {
                                 e.printStackTrace();
                             }
@@ -192,17 +209,18 @@ public class ClientService {
 
                             int bytes;
                             long size = dataInputStream.readLong();
-                            byte[] buffer = new byte[4 * 1024];
+                            byte[] buffer = new byte[4 * 1024]; // Mỗi chunk dài 4KB
 
                             String fileDirectory = String.format("storage/%s", fileName);
                             if (Files.exists(Path.of(fileDirectory))) {
                                 Files.delete(Path.of(fileDirectory));
                             }
-                            FileOutputStream fileOutputStream = new FileOutputStream(String.format("storage/%s", fileName));
+                            FileOutputStream fileOutputStream = new FileOutputStream(fileDirectory);
+                            File file = new File(fileDirectory);
                             // Ghi file từ stream xuống folder theo chunk
                             while (size > 0 && (bytes = dataInputStream.read(buffer, 0, (int) Math.min(buffer.length, size))) != -1) {
                                 fileOutputStream.write(buffer, 0, bytes);
-                                size -= bytes;      // read upto file size
+                                size -= bytes;
                             }
                             fileOutputStream.flush();
                             fileOutputStream.close();
@@ -214,7 +232,7 @@ public class ClientService {
                                 model = new DefaultListModel<>();
                                 privateChatModel.put(username, model);
                             }
-                            model.addElement(String.format("%s: %s", username, fileName));
+                            model.addElement(String.format("%s: %s", username, file.getAbsolutePath()));
 
                             privateChatModel.put(username, model);
                         }
@@ -225,10 +243,5 @@ public class ClientService {
                 e.printStackTrace();
             }
         }
-    }
-
-
-    public HashMap<String, DefaultListModel<String>> getPrivateChatModel() {
-        return privateChatModel;
     }
 }

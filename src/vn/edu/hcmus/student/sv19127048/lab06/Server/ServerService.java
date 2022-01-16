@@ -15,10 +15,10 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class ServerService {
 
-    final static int PORT = 9999;
+    final static int PORT = 9990;
 
-    private Lock lock;
-    private ServerSocket serverSocket;
+    private final Lock lock;
+    private final ServerSocket serverSocket;
     private Socket socket;
     final private String fileName = "accounts.txt";
 
@@ -85,7 +85,15 @@ public class ServerService {
 
         String username = dataInputStream.readUTF();
         String password = dataInputStream.readUTF();
-        if (clients.containsKey(username)) {
+        if (!clients.containsKey(username)) {
+            if (Files.notExists(Path.of("accounts.txt"))) {
+                Files.createFile(Path.of("accounts.txt"));
+            }
+            FileWriter fileWriter = new FileWriter("accounts.txt", true);
+            fileWriter.write(String.format("%s - %s\n", username, password));
+            fileWriter.flush();
+            fileWriter.close();
+
             ClientHandlerThread clientHandlerThread = new ClientHandlerThread(username, password, true,
                     socket, lock);
             clients.put(username, clientHandlerThread);
@@ -124,16 +132,6 @@ public class ServerService {
     }
 
     /**
-     * Save danh sách account
-     */
-    private void saveAccounts() throws IOException {
-        FileWriter fileWriter = new FileWriter(fileName);
-        for (ClientHandlerThread client : clients.values()) {
-            fileWriter.write(String.format("%s - %s\n", client.getUsername(), client.getPassword()));
-        }
-    }
-
-    /**
      * Load danh sách account
      *
      * @throws IOException
@@ -155,6 +153,10 @@ public class ServerService {
         }
 
         bufferedReader.close();
+    }
+
+    public void close() throws IOException {
+        serverSocket.close();
     }
 
     /**
@@ -257,10 +259,12 @@ public class ServerService {
                     }
                     switch (messageFromClient) {
                         case "send-text" -> {
+
                             String receiver = dataInputStream.readUTF();
                             String content = dataInputStream.readUTF();
 
                             try {
+                                // Lock synchronize
                                 lock.lock();
                                 ClientHandlerThread client = clients.get(receiver);
                                 client.dataOutputStream.writeUTF("send-text");
@@ -274,25 +278,37 @@ public class ServerService {
                             }
                         }
                         case "send-file" -> {
-                            int bytes;
-                            byte[] buffer = new byte[4 * 1024];
+
+                            int bufferSize = 4 * 1024;
+                            byte[] buffer = new byte[bufferSize];
 
                             String receiver = dataInputStream.readUTF();
                             String fileName = dataInputStream.readUTF();
                             long fileSize = dataInputStream.readLong();
 
-                            ClientHandlerThread client = clients.get(receiver);
-                            DataOutputStream clientOutputStream = client.getDataOutputStream();
-                            synchronized (lock) {
+                            try {
+                                // Lock synchronize
+                                lock.lock();
+                                ClientHandlerThread client = clients.get(receiver);
+                                DataOutputStream clientOutputStream = client.getDataOutputStream();
+
+                                // Thông tin người gửi và thông tin file
                                 clientOutputStream.writeUTF("send-file");
                                 clientOutputStream.writeUTF(username);
                                 clientOutputStream.writeUTF(fileName);
                                 clientOutputStream.writeLong(fileSize);
-                                while ((bytes = dataInputStream.read(buffer)) != -1) {
-                                    System.out.println(bytes);
-                                    clientOutputStream.write(buffer, 0, bytes);
+
+                                // Gửi file kiểu chunk
+                                while (fileSize > 0) {
+                                    dataInputStream.read(buffer, 0, (int) Math.min(fileSize, bufferSize));
+                                    client.dataOutputStream.write(buffer, 0, (int) Math.min(fileSize, bufferSize));
+                                    fileSize -= bufferSize;
                                 }
                                 clientOutputStream.flush();
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            } finally {
+                                lock.unlock();
                             }
                         }
                     }
