@@ -245,15 +245,17 @@ public class ServerService {
                 while (true) {
                     String messageFromClient = dataInputStream.readUTF();
 
+                    if (messageFromClient.equals("logout")) {
+                        dataOutputStream.writeUTF("logout");
+                        dataOutputStream.flush();
+                        socket.close();
+
+                        isLogin = false;
+                        notifyOnlineUsers();
+
+                        break;
+                    }
                     switch (messageFromClient) {
-                        case "logout" -> {
-                            isLogin = false;
-
-                            dataOutputStream.writeUTF("logging out");
-                            dataOutputStream.flush();
-                            socket.close();
-                        }
-
                         case "send-text" -> {
                             String receiver = dataInputStream.readUTF();
                             String content = dataInputStream.readUTF();
@@ -269,6 +271,28 @@ public class ServerService {
                                 e.printStackTrace();
                             } finally {
                                 lock.unlock();
+                            }
+                        }
+                        case "send-file" -> {
+                            int bytes;
+                            byte[] buffer = new byte[4 * 1024];
+
+                            String receiver = dataInputStream.readUTF();
+                            String fileName = dataInputStream.readUTF();
+                            long fileSize = dataInputStream.readLong();
+
+                            ClientHandlerThread client = clients.get(receiver);
+                            DataOutputStream clientOutputStream = client.getDataOutputStream();
+                            synchronized (lock) {
+                                clientOutputStream.writeUTF("send-file");
+                                clientOutputStream.writeUTF(username);
+                                clientOutputStream.writeUTF(fileName);
+                                clientOutputStream.writeLong(fileSize);
+                                while ((bytes = dataInputStream.read(buffer)) != -1) {
+                                    System.out.println(bytes);
+                                    clientOutputStream.write(buffer, 0, bytes);
+                                }
+                                clientOutputStream.flush();
                             }
                         }
                     }

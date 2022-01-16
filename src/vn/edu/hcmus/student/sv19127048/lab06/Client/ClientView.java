@@ -5,8 +5,6 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
 import java.awt.event.ActionEvent;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -35,7 +33,7 @@ public class ClientView extends JFrame {
         onlineListModel = new DefaultListModel<>();
 
         // Variables declaration - do not modify
-        JPanel chatBoxPanel = new JPanel();
+        chatBoxPanel = new JPanel();
         inputTextField = new JTextField();
         submitBtn = new JButton();
         JScrollPane sp = new JScrollPane();
@@ -45,26 +43,6 @@ public class ClientView extends JFrame {
         onlineList = new JList<>();
         JLabel onlineUsersLabel = new JLabel();
         sendFileBtn = new JButton();
-
-        setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
-        addWindowListener(new WindowAdapter() {
-            @Override
-            public void windowClosing(WindowEvent e) {
-                try {
-                    dataOutputStream.writeUTF("logout");
-                    dataOutputStream.flush();
-
-                    String res = dataInputStream.readUTF();
-                    System.out.println(res);
-                    if (res.equals("logging out")) {
-                        System.exit(0);
-                    }
-
-                } catch (IOException ex) {
-                    ex.printStackTrace();
-                }
-            }
-        });
 
         inputTextField.setFont(new java.awt.Font("Segoe UI", 0, 18)); // NOI18N
         inputTextField.setHorizontalAlignment(JTextField.CENTER);
@@ -218,16 +196,20 @@ public class ClientView extends JFrame {
     private DataInputStream dataInputStream;
     private DataOutputStream dataOutputStream;
 
+    private JPanel chatBoxPanel;
     private JList<String> chatHistoryList;
     private JTextField inputTextField;
     private JList<String> onlineList;
-
     private JButton sendFileBtn;
     private JButton submitBtn;
 
     private DefaultListModel<String> chatHistoryListModel;
     private DefaultListModel<String> onlineListModel;
 
+    public JPanel getChatBoxPanel() {
+        return chatBoxPanel;
+    }
+    
     public JList<String> getOnlineList() {
         return onlineList;
     }
