@@ -73,6 +73,9 @@ public class ClientService {
         });
     }
 
+    /**
+     * Thread class xử lí tin nhắn và file gửi đi
+     */
     private class Receiver extends Thread {
 
         private final DataInputStream dataInputStream;
@@ -80,6 +83,7 @@ public class ClientService {
         public Receiver(DataInputStream dataInputStream) {
             this.dataInputStream = dataInputStream;
 
+            // Xử lí gửi text
             clientView.getSubmitBtn().addActionListener(evt -> {
                 String content = clientView.getInputTextField().getText();
                 String selectedUsername = clientView.getOnlineList().getSelectedValue();
@@ -105,7 +109,6 @@ public class ClientService {
                         model = privateChatModel.get(selectedUsername);
                     } else {
                         model = new DefaultListModel<>();
-                        privateChatModel.put(selectedUsername, model);
                     }
                     model.addElement(String.format("%s: %s", username, content));
                     clientView.getChatHistoryList().setModel(model);
@@ -116,6 +119,7 @@ public class ClientService {
                 }
             });
 
+            // Xử lí gửi file
             clientView.getSendFileBtn().addActionListener(evt -> {
                 String selectedUsername = clientView.getOnlineList().getSelectedValue();
                 if (selectedUsername == null) {
@@ -157,6 +161,17 @@ public class ClientService {
                                 }
                                 dataOutputStream.flush();
                                 bufferedInputStream.close();
+
+                                DefaultListModel<String> model;
+                                if (privateChatModel.containsKey(selectedUsername)) {
+                                    model = privateChatModel.get(selectedUsername);
+                                } else {
+                                    model = new DefaultListModel<>();
+                                }
+                                model.addElement(String.format("%s: %s", username, selectedFile.getAbsolutePath()));
+                                clientView.getChatHistoryList().setModel(model);
+
+                                privateChatModel.put(selectedUsername, model);
                             } catch (IOException e) {
                                 e.printStackTrace();
                             }
@@ -172,10 +187,12 @@ public class ClientService {
                 while (true) {
                     String incomingMess = dataInputStream.readUTF();
 
+                    // Logout
                     if (incomingMess.equals("logout")) {
                         break;
                     }
                     switch (incomingMess) {
+                        // Render danh sách tài khoản online
                         case "online-users" -> {
                             String[] onlineUsers = dataInputStream.readUTF().split(";");
                             DefaultListModel<String> onlineListModel = new DefaultListModel<>();
@@ -188,6 +205,7 @@ public class ClientService {
 
                             clientView.getOnlineList().setModel(onlineListModel);
                         }
+                        // Ouput stream gửi text
                         case "send-text" -> {
                             String username = dataInputStream.readUTF();
                             String content = dataInputStream.readUTF();
@@ -197,12 +215,12 @@ public class ClientService {
                                 model = privateChatModel.get(username);
                             } else {
                                 model = new DefaultListModel<>();
-                                privateChatModel.put(username, model);
                             }
                             model.addElement(String.format("%s: %s", username, content));
 
                             privateChatModel.put(username, model);
                         }
+                        // Output stream gửi file
                         case "send-file" -> {
                             String username = dataInputStream.readUTF();
                             String fileName = dataInputStream.readUTF();
@@ -211,6 +229,9 @@ public class ClientService {
                             long size = dataInputStream.readLong();
                             byte[] buffer = new byte[4 * 1024]; // Mỗi chunk dài 4KB
 
+                            if (Files.notExists(Path.of("storage"))) {
+                                Files.createDirectory(Path.of("storage"));
+                            }
                             String fileDirectory = String.format("storage/%s", fileName);
                             if (Files.exists(Path.of(fileDirectory))) {
                                 Files.delete(Path.of(fileDirectory));
@@ -230,10 +251,8 @@ public class ClientService {
                                 model = privateChatModel.get(username);
                             } else {
                                 model = new DefaultListModel<>();
-                                privateChatModel.put(username, model);
                             }
                             model.addElement(String.format("%s: %s", username, file.getAbsolutePath()));
-
                             privateChatModel.put(username, model);
                         }
                     }

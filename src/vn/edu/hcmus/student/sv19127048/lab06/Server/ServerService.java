@@ -15,21 +15,32 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class ServerService {
 
-    final static int PORT = 9990;
+    final static int PORT = 9999;
 
     private final Lock lock;
     private final ServerSocket serverSocket;
     private Socket socket;
-    final private String fileName = "accounts.txt";
 
     static HashMap<String, ClientHandlerThread> clients = new HashMap<>();
 
+    /**
+     * Khởi tạo lock để synchronize
+     * Khởi tạo server socket
+     * Load danh sách account đã đăng ký
+     *
+     * @throws IOException
+     */
     public ServerService() throws IOException {
         this.lock = new ReentrantLock();
         this.serverSocket = new ServerSocket(PORT);
         loadAccounts();
     }
 
+    /**
+     * Chạy server
+     *
+     * @throws IOException
+     */
     public void start() throws IOException {
         while (true) {
             this.socket = serverSocket.accept();
@@ -55,7 +66,15 @@ public class ServerService {
 
         String username = dataInputStream.readUTF();
         String password = dataInputStream.readUTF();
+
         if (clients.containsKey(username)) {
+
+            if (clients.get(username).getIsLogin()) {
+                dataOutputStream.writeUTF("This account is online");
+                dataOutputStream.flush();
+                return;
+            }
+
             ClientHandlerThread client = clients.get(username);
             if (client.getPassword().equals(password)) {
                 client.setSocket(socket);
@@ -137,6 +156,7 @@ public class ServerService {
      * @throws IOException
      */
     private void loadAccounts() throws IOException {
+        String fileName = "accounts.txt";
         if (Files.notExists(Path.of(fileName))) {
             Files.createFile(Path.of(fileName));
         }
@@ -155,6 +175,11 @@ public class ServerService {
         bufferedReader.close();
     }
 
+    /**
+     * Đóng server socket
+     *
+     * @throws IOException
+     */
     public void close() throws IOException {
         serverSocket.close();
     }
@@ -180,7 +205,7 @@ public class ServerService {
          * @param username tên đăng nhập
          * @param password password
          * @param isLogin  kiểm tra xem đã login chưa
-         * @param socket   socket
+         * @param socket   socket của client
          * @param lock     khoá synchronize
          */
         ClientHandlerThread(String username, String password, Boolean isLogin, Socket socket, Lock lock)
@@ -200,8 +225,8 @@ public class ServerService {
          *
          * @param username tên đăng nhập
          * @param password password
-         * @param isLogin  kiểm tra xem đã login chưa
-         * @param lock     khoá synchronize
+         * @param isLogin  set true là online, false là offline
+         * @param lock     khoá để synchronize
          */
         ClientHandlerThread(String username, String password, Boolean isLogin, Lock lock) {
             this.username = username;
